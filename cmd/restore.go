@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"strings"
 	"time"
 
 	"github.com/urfave/cli"
@@ -32,6 +33,11 @@ func restoreCmd() cli.Command {
 				Usage:    "restore from `FILE`",
 				Required: true,
 			},
+			cli.StringFlag{
+				Name:     "user, u",
+				Usage:    "etcd user",
+				Required: false,
+			},
 			cli.BoolFlag{
 				Name:     "silent, s",
 				Usage:    "verbose mode",
@@ -53,10 +59,18 @@ func restoreAction(c *cli.Context) error {
 	}
 
 	silent := c.Bool("silent")
-	return restore(address, file, !silent)
+	userAndPass := c.String("user")
+	userAndPassArr := strings.Split(userAndPass, ":")
+	if len(userAndPassArr) != 2 {
+		return errors.New("use username:password")
+	}
+	username := userAndPassArr[0]
+	password := userAndPassArr[1]
+
+	return restore(address, file, !silent, username, password)
 }
 
-func restore(addr, filename string, print bool) error {
+func restore(addr, filename string, print bool, username string, password string) error {
 	dd, err := readDumpData(filename)
 	if err != nil {
 		return err
@@ -65,6 +79,8 @@ func restore(addr, filename string, print bool) error {
 	cli, err := clientv3.New(clientv3.Config{
 		Endpoints:   []string{addr},
 		DialTimeout: 5 * time.Second,
+		Username:    username,
+		Password:    password,
 	})
 	if err != nil {
 		return err

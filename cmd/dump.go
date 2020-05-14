@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"strings"
 	"time"
 
 	"github.com/urfave/cli"
@@ -28,6 +29,11 @@ func dumpCmd() cli.Command {
 				Name:     "address, a",
 				Usage:    "etcd address",
 				Value:    defaultEtcdAddress,
+				Required: false,
+			},
+			cli.StringFlag{
+				Name:     "user, u",
+				Usage:    "etcd user",
 				Required: false,
 			},
 			cli.StringFlag{
@@ -65,7 +71,17 @@ func dumpAction(c *cli.Context) error {
 	}
 
 	silent := c.Bool("silent")
-	dd, err := dump(address, prefix, !silent)
+
+	userAndPass := c.String("user")
+	userAndPassArr := strings.Split(userAndPass, ":")
+	if len(userAndPassArr) != 2 {
+		return errors.New("use username:password")
+	}
+
+	username := userAndPassArr[0]
+	password := userAndPassArr[1]
+
+	dd, err := dump(address, prefix, !silent, username, password)
 	if err != nil {
 		return err
 	}
@@ -81,10 +97,12 @@ func dumpAction(c *cli.Context) error {
 	return nil
 }
 
-func dump(addr, prefix string, print bool) (dumpData, error) {
+func dump(addr, prefix string, print bool, username string, password string) (dumpData, error) {
 	cli, err := clientv3.New(clientv3.Config{
 		Endpoints:   []string{addr},
 		DialTimeout: 5 * time.Second,
+		Username:    username,
+		Password:    password,
 	})
 	if err != nil {
 		return nil, err
@@ -107,13 +125,10 @@ func dump(addr, prefix string, print bool) (dumpData, error) {
 		}
 
 		dd = append(dd, b)
-
 		if print {
 			fmt.Println(string(kv.Key))
 		}
-
 	}
-
 	return dd, nil
 }
 
